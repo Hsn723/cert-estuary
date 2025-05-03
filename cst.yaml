@@ -1,0 +1,17 @@
+schemaVersion: "2.0.0"
+fileExistenceTests:
+  - name: "cert-estuary"
+    path: "/cert-estuary"
+    shouldExist: true
+    permissions: "-rwxr-xr-x"
+metadataTest:
+  entrypoint: ["/cert-estuary"]
+  labels:
+    - key: "org.opencontainers.image.authors"
+      value: "Hsn723"
+    - key: "org.opencontainers.image.title"
+      value: "cert-estuary"
+    - key: "org.opencontainers.image.source"
+      value: "https://github.com/hsn723/cert-estuary"
+licenseTests:
+  - files: ["/LICENSE"]

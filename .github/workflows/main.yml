@@ -1,0 +1,129 @@
+name: main
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '*'
+env:
+  go-version: stable
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.go-version }}
+      - name: Test
+        run: make build
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.go-version }}
+      - name: Lint
+        run: make lint
+  check-goreleaser-config:
+    name: Check goreleaser.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.go-version }}
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: check -f .goreleaser.yml
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.go-version }}
+      - name: Test
+        run: make test
+  get-k8s-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      k8s-versions: ${{ steps.get-k8s-version.outputs.versions }}
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - id: get-k8s-version
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "versions=$(make get-k8s-versions)" >> $GITHUB_OUTPUT
+  e2e:
+    name: End-to-End Tests
+    needs: get-k8s-versions
+    strategy:
+      matrix:
+        k8s-version: ${{ fromJson(needs.get-k8s-versions.outputs.k8s-versions) }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.go-version }}
+    - run: make start-e2e KIND_NODE_TAG=${{ matrix.k8s-version }}
+    - run: make test-e2e
+  all-e2e-pass:
+    name: All e2e test pass
+    needs: e2e
+    runs-on: ubuntu-latest
+    steps:
+    - run: exit 0
+  dry-run:
+    name: Dry-run release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: anchore/sbom-action/download-syft@v0.19.0
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.go-version }}
+      - name: Setup latest version tag
+        run: |
+          echo "GORELEASER_CURRENT_TAG=$(git describe --tags --abbrev=0 --match "v*" || echo v0.0.0)" >> $GITHUB_ENV
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: --snapshot --skip=sign,publish --clean
+      - name: Test built containers
+        run: make container-structure-test
+  tag:
+    name: Tag release
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    needs: [build, lint, check-goreleaser-config, test, dry-run, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+      - name: Tag release
+        run: |
+          TAG="v$(cat VERSION)"
+          git tag ${TAG}
+          git push origin ${TAG} || true
