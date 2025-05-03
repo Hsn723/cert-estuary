@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.1.5
+    hooks:
+      - id: golangci-lint
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+        exclude: charts/dkim-manager/templates/
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+ci:
+  autofix_prs: false
+  skip:
+    - golangci-lint
+    - check-merge-conflict
+    - check-toml
+    - check-yaml
+    - end-of-file-fixer
+    - mixed-line-ending
