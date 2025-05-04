@@ -23,6 +23,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// ESTAuthorizedClientFinalizer is the finalizer for ESTAuthorizedClient resources.
+	ESTAuthorizedClientFinalizer = "cert-estuary.atelierhsn.com/finalizer"
+)
+
 // ESTAuthorizedClientSpec defines the desired state of ESTAuthorizedClient.
 type ESTAuthorizedClientSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -134,6 +139,8 @@ type PresharedKeyRef struct {
 	// +kubebuilder:validation:Required
 	SecretName string `json:"secretName"`
 }
+
+const ESTAuthorizedClientConditionTypeReady = "Ready"
 
 // ESTAuthorizedClientStatus defines the observed state of ESTAuthorizedClient.
 type ESTAuthorizedClientStatus struct {
