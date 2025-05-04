@@ -39,6 +39,13 @@ rules:
   - delete
   - get
   - list
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/approval
+  verbs:
+  - update
 - apiGroups:
   - certificates.k8s.io
   resources:
