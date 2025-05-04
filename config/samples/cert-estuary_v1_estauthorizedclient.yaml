@@ -1,0 +1,9 @@
+apiVersion: cert-estuary.atelierhsn.com/v1
+kind: ESTAuthorizedClient
+metadata:
+  labels:
+    app.kubernetes.io/name: cert-estuary
+    app.kubernetes.io/managed-by: kustomize
+  name: estauthorizedclient-sample
+spec:
+  # TODO(user): Add fields here
