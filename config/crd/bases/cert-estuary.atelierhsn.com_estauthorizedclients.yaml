@@ -49,7 +49,7 @@ spec:
                   This field defaults to true.
                 type: boolean
               duration:
-                default: 47d
+                default: 1128h
                 description: |-
                   Duration is the duration for which the certificate will be valid.
                   Value must be in units accepted by Go time.ParseDuration https://golang.org/pkg/time/#ParseDuration.

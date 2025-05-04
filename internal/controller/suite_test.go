@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	certestuaryv1 "github.com/hsn723/cert-estuary/api/v1"
+	"github.com/hsn723/cert-estuary/pkg/metrics"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -40,11 +41,12 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	ctx       context.Context
-	cancel    context.CancelFunc
-	testEnv   *envtest.Environment
-	cfg       *rest.Config
-	k8sClient client.Client
+	ctx            context.Context
+	cancel         context.CancelFunc
+	testEnv        *envtest.Environment
+	cfg            *rest.Config
+	k8sClient      client.Client
+	estuaryMetrics *metrics.EstuaryMetrics
 )
 
 func TestControllers(t *testing.T) {
@@ -61,6 +63,7 @@ var _ = BeforeSuite(func() {
 	var err error
 	err = certestuaryv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	estuaryMetrics = metrics.NewEstuaryMetrics()
 
 	// +kubebuilder:scaffold:scheme
 

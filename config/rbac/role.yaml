@@ -31,14 +31,30 @@ rules:
   - patch
   - update
 - apiGroups:
+  - cert-manager.io
+  resourceNames:
+  - '*'
+  resources:
+  - signers
+  verbs:
+  - reference
+- apiGroups:
   - certificates.k8s.io
   resources:
   - certificatesigningrequests
   verbs:
+  - approve
   - create
   - delete
   - get
   - list
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/approval
+  verbs:
+  - update
 - apiGroups:
   - certificates.k8s.io
   resources:
