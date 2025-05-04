@@ -64,7 +64,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - id: get-k8s-version
-      working-directory: e2e
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -81,10 +80,8 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version: ${{ env.go-version }}
-    - run: make start KIND_NODE_TAG=${{ matrix.k8s-version }}
-      working-directory: e2e
-    - run: make test
-      working-directory: e2e
+    - run: make start-e2e KIND_NODE_TAG=${{ matrix.k8s-version }}
+    - run: make test-e2e
   all-e2e-pass:
     name: All e2e test pass
     needs: e2e

@@ -10,8 +10,7 @@ repos:
       - id: check-toml
       - id: check-yaml
         args: ["--allow-multiple-documents"]
-        exclude: charts/dkim-manager/templates/
-      - id: end-of-file-fixer
+        exclude: (charts/cert-estuary/templates/|config/helm)
       - id: mixed-line-ending
         args: ["--fix=lf"]
 ci:
@@ -21,5 +20,4 @@ ci:
     - check-merge-conflict
     - check-toml
     - check-yaml
-    - end-of-file-fixer
     - mixed-line-ending

@@ -64,8 +64,6 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-# TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
-# The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
 .PHONY: test-e2e
@@ -74,7 +72,7 @@ test-e2e:
 		echo "Kind is not installed. Please install Kind manually."; \
 		exit 1; \
 	}
-	@$(KIND) get clusters | grep -q 'kind' || { \
+	@$(KIND) get clusters | grep -q '$(PROJECT_NAME)' || { \
 		echo "No Kind cluster is running. Please start a Kind cluster before running the e2e tests."; \
 		exit 1; \
 	}
@@ -87,8 +85,8 @@ start-kind:
 
 .PHONY: deploy-image
 deploy-image:
-	cd ..; CGO_ENABLED=0 go build -o $(PROJECT_NAME) -ldflags="-w -s" cmd/main.go
-	cd ..; docker build --no-cache -t $(PROJECT_NAME):dev .
+	CGO_ENABLED=0 go build -o $(PROJECT_NAME) -ldflags="-w -s" cmd/cert-estuary/main.go
+	docker build --no-cache -t $(PROJECT_NAME):dev .
 	$(KIND) load docker-image $(PROJECT_NAME):dev --name=$(PROJECT_NAME)
 
 .PHONY: stop-kind
@@ -98,7 +96,7 @@ stop-kind:
 	-docker image prune -f
 
 .PHONY: start-e2e
-start-e2e: $(KIND) $(KUBECTL) start-kind deploy-image deploy
+start-e2e: kind kubectl start-kind deploy-image deploy
 
 .PHONY: lint
 lint:
@@ -110,11 +108,11 @@ lint:
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -o bin/manager cmd/cert-estuary/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+	go run ./cmd/cert-estuary/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -186,6 +184,8 @@ KIND ?= $(LOCALBIN)/kind
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
+CONTAINER_STRUCTURE_TEST = $(LOCALBIN)/container-structure-test
+YQ = $(LOCALBIN)/yq
 
 KUBERNETES_VERSION = $(shell curl -L -s https://dl.k8s.io/release/stable.txt)
 KIND_NODE_TAG = ""
@@ -200,10 +200,14 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= v1.63.4
 
+.PHONY: kubectl
+kubectl: $(KUBECTL) ## Download kubectl locally if necessary.
 $(KUBECTL): $(LOCALBIN)
 	curl -sfL -o $@ https://dl.k8s.io/release/$(KUBERNETES_VERSION)/bin/linux/amd64/kubectl
 	chmod a+x $@
 
+.PHONY: kind
+kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	curl -sfL -o $@ https://github.com/kubernetes-sigs/kind/releases/latest/download/kind-linux-amd64
 	chmod a+x $@
@@ -247,15 +251,17 @@ mv $(1) $(1)-$(3) ;\
 ln -sf $(1)-$(3) $(1)
 endef
 
-CONTAINER_STRUCTURE_TEST = $(LOCALBIN)/container-structure-test
+.PHONY: container-structure-test
+container-structure-test: $(CONTAINER_STRUCTURE_TEST) # Download container-structure-test locally if necessary.
 $(CONTAINER_STRUCTURE_TEST): $(LOCALBIN)
 	curl -sSLf -o $(CONTAINER_STRUCTURE_TEST) https://github.com/GoogleContainerTools/container-structure-test/releases/latest/download/container-structure-test-linux-amd64 && chmod +x $(CONTAINER_STRUCTURE_TEST)
 
 .PHONY: container-structure-test
-container-structure-test: $(CONTAINER_STRUCTURE_TEST) $(YQ)
+container-structure-test: container-structure-test yq
 	$(YQ) '.builds[0] | .goarch[]' .goreleaser.yml | xargs -I {} $(CONTAINER_STRUCTURE_TEST) test --image ghcr.io/hsn723/$(PROJECT_NAME):$(shell git describe --tags --abbrev=0 --match "v*" || echo v0.0.0)-next-{} --platform linux/{} --config cst.yaml
 
-.PHONY: $(YQ)
+.PHONY: yq
+yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@latest
 
