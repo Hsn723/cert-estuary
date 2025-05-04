@@ -58,7 +58,7 @@ spec:
                   This field defaults to true.
                 type: boolean
               duration:
-                default: 47d
+                default: 1128h
                 description: |-
                   Duration is the duration for which the certificate will be valid.
                   Value must be in units accepted by Go time.ParseDuration https://golang.org/pkg/time/#ParseDuration.
@@ -85,7 +85,7 @@ spec:
                   This field defaults to true.
                 type: boolean
               renewBefore:
-                default: 15d
+                default: 360h
                 description: |-
                   RenewBefore is the duration before the certificate's expiration
                   when the certificate should be renewed.
