@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- cert-estuary_v1_estauthorizedclient.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
