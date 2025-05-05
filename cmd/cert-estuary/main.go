@@ -40,6 +40,7 @@ import (
 
 	certestuaryv1 "github.com/hsn723/cert-estuary/api/v1"
 	"github.com/hsn723/cert-estuary/internal/controller"
+	"github.com/hsn723/cert-estuary/pkg/estserver"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -57,6 +58,9 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	var estServerAddr string
+	var estServerCertPath, estServerCertName, estServerCertKey string
+	var estCACertFilePath string
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -65,12 +69,21 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	flag.StringVar(&estServerAddr, "est-server-bind-address", estserver.DefaultBindAddress, "The address the EST server binds to. ")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&estServerCertPath, "est-server-cert-path", "",
+		"The directory that contains the EST server certificate.")
+	flag.StringVar(&estServerCertName, "est-server-cert-name", "tls.crt",
+		"The name of the EST server certificate file.")
+	flag.StringVar(&estServerCertKey, "est-server-cert-key", "tls.key",
+		"The name of the EST server key file.")
+	flag.StringVar(&estCACertFilePath, "est-ca-cert-filepath", "",
+		"The path to the CA certificates for the EST server /cacerts endpoint.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", true,
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
@@ -105,8 +118,27 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
-	// Create watchers for metrics and webhooks certificates
-	var metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
+	// Create watchers for server, metrics and webhooks certificates
+	var estServerCertWatcher, metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
+
+	// Initial EST server TLS options
+	estServerTLSOpts := tlsOpts
+	if len(estServerCertPath) > 0 {
+		setupLog.Info("Initializing EST server certificate watcher using provided certificates",
+			"est-server-cert-path", estServerCertPath, "est-server-cert-name", estServerCertName, "est-server-cert-key", estServerCertKey)
+		var err error
+		estServerCertWatcher, err = certwatcher.New(
+			filepath.Join(estServerCertPath, estServerCertName),
+			filepath.Join(estServerCertPath, estServerCertKey),
+		)
+		if err != nil {
+			setupLog.Error(err, "Failed to initialize EST server certificate watcher")
+			os.Exit(1)
+		}
+		estServerTLSOpts = append(estServerTLSOpts, func(config *tls.Config) {
+			config.GetCertificate = estServerCertWatcher.GetCertificate
+		})
+	}
 
 	// Initial webhook TLS options
 	webhookTLSOpts := tlsOpts
@@ -218,6 +250,23 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
+	estServer := estserver.NewServer(estserver.Options{
+		BindAddress: estServerAddr,
+		Logger:      ctrl.Log.WithName("est-server"),
+		CACertPath:  estCACertFilePath,
+		TLSOpts:     estServerTLSOpts,
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+	})
+
+	if estServerCertWatcher != nil {
+		setupLog.Info("Adding EST server certificate watcher to manager")
+		if err := mgr.Add(estServerCertWatcher); err != nil {
+			setupLog.Error(err, "unable to add EST server certificate watcher to manager")
+			os.Exit(1)
+		}
+	}
+
 	if metricsCertWatcher != nil {
 		setupLog.Info("Adding metrics certificate watcher to manager")
 		if err := mgr.Add(metricsCertWatcher); err != nil {
@@ -242,6 +291,14 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	setupLog.Info("starting EST server")
+	go func() {
+		if err := estServer.Start(ctx); err != nil {
+			setupLog.Error(err, "problem running EST server")
+			os.Exit(1)
+		}
+	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
