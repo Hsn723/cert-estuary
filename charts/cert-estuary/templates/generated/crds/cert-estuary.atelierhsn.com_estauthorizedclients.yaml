@@ -1,0 +1,218 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: '{{ template "project.namespacedname" . }}-serving-cert'
+    controller-gen.kubebuilder.io/version: v0.17.2
+  labels:
+    app.kubernetes.io/managed-by: '{{ .Release.Service }}'
+    app.kubernetes.io/name: '{{ include "project.name" . }}'
+    app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
+    helm.sh/chart: '{{ include "project.chart" . }}'
+  name: estauthorizedclients.cert-estuary.atelierhsn.com
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          name: '{{ template "project.fullname" . }}-webhook-service'
+          namespace: '{{ .Release.Namespace }}'
+          path: /convert
+      conversionReviewVersions:
+      - v1
+  group: cert-estuary.atelierhsn.com
+  names:
+    kind: ESTAuthorizedClient
+    listKind: ESTAuthorizedClientList
+    plural: estauthorizedclients
+    singular: estauthorizedclient
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ESTAuthorizedClient is the Schema for the estauthorizedclients
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ESTAuthorizedClientSpec defines the desired state of ESTAuthorizedClient.
+            properties:
+              autoRenew:
+                default: true
+                description: |-
+                  AutoRenew indicates whether the certificate should be automatically renewed
+                  when it is close to expiration. If set to true, the controller will
+                  automatically renew the certificate before it expires.
+                  If set to false, the certificate will not be automatically renewed.
+                  This field defaults to true.
+                type: boolean
+              csrAutoApprove:
+                default: true
+                description: |-
+                  CSRAutoApprove indicates whether the Certificate Signing Request (CSR) should be automatically approved.
+                  If set to true, the CSR will be automatically approved by the controller.
+                  If set to false, the CSR will need to be manually approved by a user with the appropriate permissions.
+                  This field defaults to true.
+                type: boolean
+              duration:
+                default: 1128h
+                description: |-
+                  Duration is the duration for which the certificate will be valid.
+                  Value must be in units accepted by Go time.ParseDuration https://golang.org/pkg/time/#ParseDuration.
+                type: string
+              presharedKeyRef:
+                description: |-
+                  PresharedKeyRef is a reference to a secret that contains the pre-shared key
+                  used for authentication. The secret must be in the same namespace as the ESTAuthorizedClient resource.
+                  The secret should contain a key named "username" for the username and "password" for the password.
+                properties:
+                  secretName:
+                    description: SecretName is the name of the secret that contains
+                      the pre-shared key.
+                    type: string
+                required:
+                - secretName
+                type: object
+              removeExpired:
+                default: true
+                description: |-
+                  RemoveExpired indicates whether expired certificates should be removed
+                  from the Kubernetes cluster. If set to true, expired certificates will be
+                  removed. If set to false, expired certificates will be retained.
+                  This field defaults to true.
+                type: boolean
+              renewBefore:
+                default: 360h
+                description: |-
+                  RenewBefore is the duration before the certificate's expiration
+                  when the certificate should be renewed.
+                  Value must be in units accepted by Go time.ParseDuration https://golang.org/pkg/time/#ParseDuration.
+                type: string
+              renewBeforePercentage:
+                default: 0.6
+                description: |-
+                  RenewBeforePercentage is the percentage of the certificate's duration
+                  when the certificate should be renewed. If both RenewBefore and
+                  RenewBeforePercentage are set, the controller will use the earlier of the two.
+                type: number
+              signerName:
+                description: |-
+                  SignerName is the name of the Issuer or ClusterIssuer
+                  that will be used to sign the certificate.
+                  It should be in the format "issuers.cert-manager.io/<namespace>.<issuer-name>" or
+                  "clusterissuers.cert-manager.io/<cluster-issuer-name>".
+                  See https://cert-manager.io/docs/usage/kube-csr/#signer-name for more details.
+                pattern: ^(issuers|clusterissuers)\.cert-manager\.io/([a-z][a-z-]*\.)?[a-z][a-z-]*$
+                type: string
+              subject:
+                description: |-
+                  Subject is the Common Name (CN) of the client certificate.
+                  It is used to identify the client when requesting a certificate from the EST server.
+                type: string
+              subjectAltNames:
+                description: |-
+                  SubjectAltNames is an optional field that allows you to specify additional
+                  subject alternative names for the certificate. These names can be used to identify the client
+                  in addition to the main subject DN.
+                items:
+                  type: string
+                type: array
+            required:
+            - autoRenew
+            - csrAutoApprove
+            - duration
+            - removeExpired
+            - renewBefore
+            - renewBeforePercentage
+            - signerName
+            - subject
+            type: object
+          status:
+            description: ESTAuthorizedClientStatus defines the observed state of ESTAuthorizedClient.
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              latestCSRName:
+                description: CurrentCSRName is the name of the latest CertificateSigningRequest.
+                type: string
+              previousCSRName:
+                description: PreviousCSRName is the name of the previous CertificateSigningRequest.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
