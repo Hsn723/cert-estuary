@@ -66,12 +66,12 @@ spec:
     subjectAltNames:
         - cisco.example.com
         - ipsec2.example.com
-    preSharedSecretRef:
-        secretName: my-psk
     signerName: issuers.cert-manager.io/app-cert-estuary/my-issuer
 
     # By default, CertificateSigningRequests are automatically approved.
-    # To require manual approval by administrators before issuing certificates, set this to false.
+    # To require manual approval by administrators before issuing certificates,
+    # or if another controller such as cert-manager's approver-policy is in place,
+    # set this to false.
     csrAutoApprove: true
 
     duration: 1128h # 47d
@@ -101,7 +101,7 @@ data:
     password: piyo
 ```
 
-When requesting or renewing a certificate, via the EST `/simpleenroll` or `/simplereenroll` endpoints, `cert-estuary` validates the client by looking for an `ESTAuthorizedClient` matching the Subject and SubjectAltNames in the CSR. These values must then match the client certificate presented during the initial TLS handshake. If no client certificate is available, `cert-estuary` requests the client to authenticate via HTTP Digest if a pre-shared key is configured.
+When requesting or renewing a certificate, via the EST `/simpleenroll` or `/simplereenroll` endpoints, `cert-estuary` validates the client by looking for an `ESTAuthorizedClient` matching the CommonName in the CSR. These values must then match the client certificate presented during the initial TLS handshake. In the future, if no client certificate is available, `cert-estuary` may rely on alternate authentication methods such as TLS-SRP or HTTP Digest if a pre-shared key is configured but at the time being, **only client certificate authentication is supported**.
 
 Once the EST client is properly authenticated, the CSR payload is saved into a Kubernetes built-in `CertificateSigningRequest` resource for `cert-manager` to handle.
 
