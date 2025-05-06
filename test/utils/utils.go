@@ -249,3 +249,28 @@ func UncommentCode(filename, target, prefix string) error {
 	// nolint:gosec
 	return os.WriteFile(filename, out.Bytes(), 0644)
 }
+
+func GetCurlPodSpec(serviceName, namespace, endpoint, serviceAccountName string, port int) string {
+	return fmt.Sprintf(`{
+		"spec": {
+			"containers": [{
+				"name": "curl",
+				"image": "curlimages/curl:latest",
+				"command": ["/bin/sh", "-c"],
+				"args": ["curl -v -k https://%s.%s.svc.cluster.local:%d/%s"],
+				"securityContext": {
+					"allowPrivilegeEscalation": false,
+					"capabilities": {
+						"drop": ["ALL"]
+					},
+					"runAsNonRoot": true,
+					"runAsUser": 1000,
+					"seccompProfile": {
+						"type": "RuntimeDefault"
+					}
+				}
+			}],
+			"serviceAccount": "%s"
+		}
+	}`, serviceName, namespace, port, endpoint, serviceAccountName)
+}

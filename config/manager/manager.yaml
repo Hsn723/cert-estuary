@@ -59,13 +59,22 @@ spec:
           type: RuntimeDefault
       containers:
       - command:
-        - /manager
+        - /cert-estuary
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
         image: controller:latest
         name: manager
-        ports: []
+        ports:
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        - containerPort: 8443
+          name: metrics
+          protocol: TCP
+        - containerPort: 4443
+          name: est-server
+          protocol: TCP
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

@@ -39,6 +39,8 @@ const serviceAccountName = "cert-estuary-controller-manager"
 // metricsServiceName is the name of the metrics service of the project
 const metricsServiceName = "cert-estuary-controller-manager-metrics-service"
 
+const estServiceName = "cert-estuary-est-server"
+
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
 const metricsRoleBindingName = "cert-estuary-metrics-binding"
 
@@ -49,26 +51,26 @@ var _ = Describe("Manager", Ordered, func() {
 	// enforce the restricted security policy to the namespace, installing CRDs,
 	// and deploying the controller.
 	BeforeAll(func() {
-		By("creating manager namespace")
-		cmd := exec.Command("kubectl", "create", "ns", namespace)
-		_, err := utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
+		// By("creating manager namespace")
+		// cmd := exec.Command("kubectl", "create", "ns", namespace)
+		// _, err := utils.Run(cmd)
+		// Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
 
 		By("labeling the namespace to enforce the restricted security policy")
-		cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
+		cmd := exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
 			"pod-security.kubernetes.io/enforce=restricted")
-		_, err = utils.Run(cmd)
+		_, err := utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with restricted policy")
 
-		By("installing CRDs")
-		cmd = exec.Command("make", "install")
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
+		// By("installing CRDs")
+		// cmd = exec.Command("make", "install")
+		// _, err = utils.Run(cmd)
+		// Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
 
-		By("deploying the controller-manager")
-		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
+		// By("deploying the controller-manager")
+		// cmd = exec.Command("make", "deploy")
+		// _, err = utils.Run(cmd)
+		// Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
 	})
 
 	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
@@ -170,6 +172,55 @@ var _ = Describe("Manager", Ordered, func() {
 			Eventually(verifyControllerUp).Should(Succeed())
 		})
 
+		It("should ensure that the EST server is running", func() {
+			By("validating that the EST service is available")
+			cmd := exec.Command("kubectl", "get", "service", estServiceName, "-n", namespace)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "EST service should exist")
+
+			By("waiting for the EST endpoint to be ready")
+			verifyEstEndpointReady := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "endpoints", estServiceName, "-n", namespace)
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring("4443"), "EST endpoint is not ready")
+			}
+			Eventually(verifyEstEndpointReady).Should(Succeed())
+
+			By("validating that the controller manager is serving the EST server")
+			verifyEstServerStarted := func(g Gomega) {
+				cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring("est-server\tstarting server"),
+					"EST server not yet started")
+			}
+			Eventually(verifyEstServerStarted).Should(Succeed())
+
+			By("creating the curl-est pod to access the EST endpoint")
+			cmd = exec.Command("kubectl", "run", "curl-est", "--restart=Never",
+				"--namespace", namespace,
+				"--image=curlimages/curl:latest",
+				"--overrides",
+				utils.GetCurlPodSpec(estServiceName, namespace, ".well-known/est/cacerts", "default", 4443))
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create curl-est pod")
+
+			By("waiting for the curl-est pod to complete.")
+			Eventually(verifyCurlUp, 5*time.Minute).WithArguments("curl-est", namespace).Should(Succeed())
+
+			By("getting the EST server response by checking curl-est logs")
+			expected := []string{
+				"< HTTP/1.1 200 OK",
+				"Content-Type: application/pkcs7-mime",
+			}
+			unexpected := []string{}
+			_ = getESTOutput(expected, unexpected)
+
+			// TODO: create a dummy client certificate and check /simpleenroll and /simplereenroll
+			// endpoints.
+		})
+
 		It("should ensure the metrics endpoint is serving metrics", func() {
 			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
 			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
@@ -239,15 +290,7 @@ var _ = Describe("Manager", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred(), "Failed to create curl-metrics pod")
 
 			By("waiting for the curl-metrics pod to complete.")
-			verifyCurlUp := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "pods", "curl-metrics",
-					"-o", "jsonpath={.status.phase}",
-					"-n", namespace)
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("Succeeded"), "curl pod in wrong status")
-			}
-			Eventually(verifyCurlUp, 5*time.Minute).Should(Succeed())
+			Eventually(verifyCurlUp, 5*time.Minute).WithArguments("curl-metrics", namespace).Should(Succeed())
 
 			By("getting the metrics by checking curl-metrics logs")
 			metricsOutput := getMetricsOutput()
@@ -257,15 +300,6 @@ var _ = Describe("Manager", Ordered, func() {
 		})
 
 		// +kubebuilder:scaffold:e2e-webhooks-checks
-
-		// TODO: Customize the e2e test suite with scenarios specific to your project.
-		// Consider applying sample/CR(s) and check their status and/or verifying
-		// the reconciliation by using the metrics, i.e.:
-		// metricsOutput := getMetricsOutput()
-		// Expect(metricsOutput).To(ContainSubstring(
-		//    fmt.Sprintf(`controller_runtime_reconcile_total{controller="%s",result="success"} 1`,
-		//    strings.ToLower(<Kind>),
-		// ))
 	})
 })
 
@@ -318,6 +352,29 @@ func getMetricsOutput() string {
 	Expect(err).NotTo(HaveOccurred(), "Failed to retrieve logs from curl pod")
 	Expect(metricsOutput).To(ContainSubstring("< HTTP/1.1 200 OK"))
 	return metricsOutput
+}
+
+func verifyCurlUp(g Gomega, name, namespace string) {
+	cmd := exec.Command("kubectl", "get", "pods", name,
+		"-o", "jsonpath={.status.phase}",
+		"-n", namespace)
+	output, err := utils.Run(cmd)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(output).To(Equal("Succeeded"), "curl pod in wrong status")
+}
+
+func getESTOutput(expected, unexpected []string) string {
+	By("getting the curl-est logs")
+	cmd := exec.Command("kubectl", "logs", "curl-est", "-n", namespace)
+	estOutput, err := utils.Run(cmd)
+	Expect(err).NotTo(HaveOccurred(), "Failed to retrieve logs from curl pod")
+	for _, str := range expected {
+		Expect(estOutput).To(ContainSubstring(str))
+	}
+	for _, str := range unexpected {
+		Expect(estOutput).NotTo(ContainSubstring(str))
+	}
+	return estOutput
 }
 
 // tokenRequest is a simplified representation of the Kubernetes TokenRequest API response,

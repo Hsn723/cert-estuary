@@ -5,14 +5,14 @@ metadata:
     control-plane: controller-manager
     app.kubernetes.io/name: cert-estuary
     app.kubernetes.io/managed-by: kustomize
-  name: controller-manager-metrics-service
-  namespace: system
+  name: est-server
+  namespace: cert-estuary-system
 spec:
   ports:
-  - name: metrics
-    port: 8443
+  - name: est-server
+    port: 4443
     protocol: TCP
-    targetPort: 8443
+    targetPort: 4443
   selector:
     control-plane: controller-manager
     app.kubernetes.io/name: cert-estuary

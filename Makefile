@@ -1,6 +1,11 @@
 PROJECT_NAME = cert-estuary
 # Image URL to use all building/pushing image targets
-IMG ?= ghcr.io/hsn723/$(PROJECT_NAME):latest
+IMG ?= ghcr.io/hsn723/$(PROJECT_NAME):dev
+export IMG
+
+CERT_MANAGER_VERSION ?= v1.16.3
+KIND_CLUSTER ?= $(PROJECT_NAME)
+export KIND_CLUSTER
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -75,7 +80,7 @@ test-e2e:
 		echo "Kind is not installed. Please install Kind manually."; \
 		exit 1; \
 	}
-	@$(KIND) get clusters | grep -q '$(PROJECT_NAME)' || { \
+	@$(KIND) get clusters | grep -q '$(KIND_CLUSTER)' || { \
 		echo "No Kind cluster is running. Please start a Kind cluster before running the e2e tests."; \
 		exit 1; \
 	}
@@ -84,22 +89,22 @@ test-e2e:
 
 .PHONY: start-kind
 start-kind:
-	$(KIND) create cluster --name=$(PROJECT_NAME) --config=$(KIND_CONFIG) --image=kindest/node:v$(KIND_NODE_TAG) --wait 1m
+	$(KIND) create cluster --name=$(KIND_CLUSTER) --config=$(KIND_CONFIG) --image=kindest/node:v$(KIND_NODE_TAG) --wait 1m
 
 .PHONY: deploy-image
 deploy-image:
 	CGO_ENABLED=0 go build -o $(PROJECT_NAME) -ldflags="-w -s" cmd/cert-estuary/main.go
-	docker build --no-cache -t $(PROJECT_NAME):dev .
-	$(KIND) load docker-image $(PROJECT_NAME):dev --name=$(PROJECT_NAME)
+	docker build --no-cache -t $(IMG) .
+	$(KIND) load docker-image $(IMG) --name=$(KIND_CLUSTER)
 
 .PHONY: stop-kind
 stop-kind:
-	$(KIND) delete cluster --name=$(PROJECT_NAME)
-	-docker image rm $(PROJECT_NAME):dev
+	$(KIND) delete cluster --name=$(KIND_CLUSTER)
+	-docker image rm $(IMG)
 	-docker image prune -f
 
 .PHONY: start-e2e
-start-e2e: kind kubectl start-kind deploy-image deploy
+start-e2e: kind kubectl start-kind deploy-image deploy-cert-manager deploy
 
 .PHONY: lint
 lint:
@@ -123,10 +128,6 @@ run: manifests generate fmt vet ## Run a controller from your host.
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) push ${IMG}
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -164,6 +165,11 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: deploy-cert-manager
+deploy-cert-manager: ## Deploy cert-manager to the K8s cluster specified in ~/.kube/config.
+	$(KUBECTL) apply -f https://github.com/cert-manager/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml
+	$(KUBECTL) wait deployment.apps/cert-manager-webhook --for=condition=Available --timeout=5m -n cert-manager
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
