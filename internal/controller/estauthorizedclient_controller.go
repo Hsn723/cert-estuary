@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	certestuaryv1 "github.com/hsn723/cert-estuary/api/v1"
+	"github.com/hsn723/cert-estuary/pkg/metrics"
 )
 
 // ESTAuthorizedClientReconciler reconciles a ESTAuthorizedClient object
@@ -48,6 +49,8 @@ type ESTAuthorizedClientReconciler struct {
 	Queue      chan reconcile.Request
 	// workaround for https://github.com/kubernetes-sigs/controller-runtime/issues/550
 	ReadClient client.Reader
+
+	Metrics *metrics.EstuaryMetrics
 }
 
 // +kubebuilder:rbac:groups=cert-estuary.atelierhsn.com,resources=estauthorizedclients,verbs=get;list;watch;create;update;patch;delete

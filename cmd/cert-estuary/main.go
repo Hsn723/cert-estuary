@@ -41,6 +41,7 @@ import (
 	certestuaryv1 "github.com/hsn723/cert-estuary/api/v1"
 	"github.com/hsn723/cert-estuary/internal/controller"
 	"github.com/hsn723/cert-estuary/pkg/estserver"
+	"github.com/hsn723/cert-estuary/pkg/metrics"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -239,11 +240,14 @@ func main() {
 	kubeClient := kubernetes.NewForConfigOrDie(cfg)
 	ctx := ctrl.SetupSignalHandler()
 
+	metrics := metrics.NewEstuaryMetrics()
+
 	if err = (&controller.ESTAuthorizedClientReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
 		KubeClient: kubeClient,
 		ReadClient: mgr.GetAPIReader(),
+		Metrics:    metrics,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ESTAuthorizedClient")
 		os.Exit(1)
@@ -257,6 +261,7 @@ func main() {
 		TLSOpts:     estServerTLSOpts,
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
+		Metrics:     metrics,
 	})
 
 	if estServerCertWatcher != nil {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
+	"github.com/hsn723/cert-estuary/pkg/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,6 +60,9 @@ type Options struct {
 	// TLSOpts is used  to allow configuring the TLS config used for the server.
 	// this also allows providing a certificate via GetCertificate.
 	TLSOpts []func(*tls.Config)
+
+	// Metrics is the metrics used for the server.
+	Metrics *metrics.EstuaryMetrics
 }
 
 type Server interface {

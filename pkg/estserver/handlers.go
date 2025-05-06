@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/justinas/alice"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -74,15 +75,19 @@ func (s *ESTServer) setupHandlers(f http.HandlerFunc, handlers ...alice.Construc
 }
 
 func (s *ESTServer) handleCACerts(w http.ResponseWriter, r *http.Request) {
+	timer := prometheus.NewTimer(s.Options.Metrics.RequestDuration.WithLabelValues("/cacerts"))
+	defer timer.ObserveDuration()
 	raw, err := os.ReadFile(s.Options.CACertPath)
 	if err != nil {
 		s.Options.Logger.Error(err, "failed to read CA cert", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/cacerts", "error").Inc()
 		http.Error(w, "failed to read CA cert", http.StatusInternalServerError)
 		return
 	}
 	p7c, estErr := s.encodePKCS7Response(raw)
 	if estErr.Error != nil {
 		s.Options.Logger.Error(estErr.Error, "failed to encode CA cert", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/cacerts", "error").Inc()
 		http.Error(w, estErr.Error.Error(), estErr.Code)
 		return
 	}
@@ -90,24 +95,32 @@ func (s *ESTServer) handleCACerts(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err = w.Write(p7c); err != nil {
 		s.Options.Logger.Error(err, "failed to write PKCS #7 certificate", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/cacerts", "error").Inc()
+		return
 	}
+	s.Options.Metrics.Requests.WithLabelValues("/cacerts", "success").Inc()
 }
 
 func (s *ESTServer) handleSimpleEnroll(w http.ResponseWriter, r *http.Request) {
+	timer := prometheus.NewTimer(s.Options.Metrics.RequestDuration.WithLabelValues("/simpleenroll"))
+	defer timer.ObserveDuration()
 	csr, eac, err := s.retrieveRequestContext(r)
 	if err.Error != nil {
 		s.Options.Logger.Error(err.Error, "failed to retrieve request context", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/simpleenroll", "error").Inc()
 		http.Error(w, err.Error.Error(), err.Code)
 		return
 	}
 	p7c, err := s.doSimpleEnroll(r.Context(), csr, eac)
 	if err.Error != nil {
 		s.Options.Logger.Error(err.Error, "failed to enroll certificate", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/simpleenroll", "error").Inc()
 		http.Error(w, err.Error.Error(), err.Code)
 		return
 	}
 	w.Header().Set("Content-Type", "application/pkcs7-mime")
 	if err.Code == http.StatusAccepted {
+		s.Options.Metrics.Requests.WithLabelValues("/simpleenroll", "pending").Inc()
 		w.Header().Set("Retry-After", "60")
 		w.WriteHeader(err.Code)
 		return
@@ -115,24 +128,32 @@ func (s *ESTServer) handleSimpleEnroll(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(p7c); err != nil {
 		s.Options.Logger.Error(err, "failed to write PKCS #7 certificate", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/simpleenroll", "error").Inc()
+		return
 	}
+	s.Options.Metrics.Requests.WithLabelValues("/simpleenroll", "success").Inc()
 }
 
 func (s *ESTServer) handleSimpleReenroll(w http.ResponseWriter, r *http.Request) {
+	timer := prometheus.NewTimer(s.Options.Metrics.RequestDuration.WithLabelValues("/simplereenroll"))
+	defer timer.ObserveDuration()
 	csr, eac, err := s.retrieveRequestContext(r)
 	if err.Error != nil {
 		s.Options.Logger.Error(err.Error, "failed to retrieve request context", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/simplereenroll", "error").Inc()
 		http.Error(w, err.Error.Error(), err.Code)
 		return
 	}
 	p7c, err := s.doSimpleReenroll(r.Context(), csr, eac)
 	if err.Error != nil {
 		s.Options.Logger.Error(err.Error, "failed to reenroll certificate", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/simplereenroll", "error").Inc()
 		http.Error(w, err.Error.Error(), err.Code)
 		return
 	}
 	w.Header().Set("Content-Type", "application/pkcs7-mime")
 	if err.Code == http.StatusAccepted {
+		s.Options.Metrics.Requests.WithLabelValues("/simplereenroll", "pending").Inc()
 		w.Header().Set("Retry-After", "60")
 		w.WriteHeader(err.Code)
 		return
@@ -140,5 +161,8 @@ func (s *ESTServer) handleSimpleReenroll(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(p7c); err != nil {
 		s.Options.Logger.Error(err, "failed to write PKCS #7 certificate", "requestID", getRequestID(r))
+		s.Options.Metrics.Requests.WithLabelValues("/simplereenroll", "error").Inc()
+		return
 	}
+	s.Options.Metrics.Requests.WithLabelValues("/simplereenroll", "success").Inc()
 }
