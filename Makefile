@@ -45,8 +45,11 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: kustomize controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:allowDangerousTypes=true webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(KUSTOMIZE) build config/helm/overlays/crds > charts/$(PROJECT_NAME)/templates/generated/crds/$(PROJECT_NAME).atelierhsn.com_estauthorizedclients.yaml
+	# $(KUSTOMIZE) build config/helm/overlays/templates > charts/$(PROJECT_NAME)/templates/generated/generated.yaml
+	sed -i "s/\(appVersion: \)[0-9]\+\.[0-9]\+\.[0-9]\+/\1$$(cat VERSION)/" charts/$(PROJECT_NAME)/Chart.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -179,13 +182,14 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
+HELM ?=  $(LOCALBIN)/helm
 KUBECTL ?= $(LOCALBIN)/kubectl
 KIND ?= $(LOCALBIN)/kind
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 CONTAINER_STRUCTURE_TEST = $(LOCALBIN)/container-structure-test
-YQ = $(LOCALBIN)/yq
+YQ ?= $(LOCALBIN)/yq
 
 KUBERNETES_VERSION = $(shell curl -L -s https://dl.k8s.io/release/stable.txt)
 KIND_NODE_TAG = ""
@@ -199,6 +203,7 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= v1.63.4
+HELM_VERSION ?= 3.17.0
 
 .PHONY: kubectl
 kubectl: $(KUBECTL) ## Download kubectl locally if necessary.
@@ -211,6 +216,12 @@ kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	curl -sfL -o $@ https://github.com/kubernetes-sigs/kind/releases/latest/download/kind-linux-amd64
 	chmod a+x $@
+
+.PHONY: helm
+helm: $(HELM) ## Download helm locally if necessary.
+$(HELM): $(BINDIR)
+	curl -L -sS https://get.helm.sh/helm-v$(HELM_VERSION)-linux-amd64.tar.gz \
+	  | tar xz -C $(BINDIR) --strip-components 1 linux-amd64/helm
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
