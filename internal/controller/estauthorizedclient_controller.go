@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	certestuaryv1 "github.com/hsn723/cert-estuary/api/v1"
+	"github.com/hsn723/cert-estuary/pkg/metrics"
 )
 
 // ESTAuthorizedClientReconciler reconciles a ESTAuthorizedClient object
@@ -43,6 +46,8 @@ type ESTAuthorizedClientReconciler struct {
 	Queue      chan reconcile.Request
 	// workaround for https://github.com/kubernetes-sigs/controller-runtime/issues/550
 	ReadClient client.Reader
+
+	Metrics *metrics.EstuaryMetrics
 }
 
 // +kubebuilder:rbac:groups=cert-estuary.atelierhsn.com,resources=estauthorizedclients,verbs=get;list;watch;create;update;patch;delete
@@ -185,6 +190,7 @@ func (r *ESTAuthorizedClientReconciler) reconcile(ctx context.Context, eac *cert
 				Reason:  "CertificateReady",
 				Message: "Certificate is ready",
 			})
+			r.gatherCertificateMetrics(ctx, eac.Name, csr.Status.Certificate)
 			return ctrl.Result{}, r.Status().Update(ctx, eac)
 		}
 		// Sanity: if the CSR is not approved yet, set the status to false
@@ -216,6 +222,28 @@ func (r *ESTAuthorizedClientReconciler) approveCSR(ctx context.Context, csr *cer
 	})
 	_, err := r.KubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, v1.UpdateOptions{})
 	return err
+}
+
+func (r *ESTAuthorizedClientReconciler) gatherCertificateMetrics(ctx context.Context, clientName string, certPEM []byte) {
+	logger := logf.FromContext(ctx)
+	var certDER []byte
+	for {
+		block, rest := pem.Decode(certPEM)
+		if block == nil {
+			break
+		}
+		if block.Type == "CERTIFICATE" {
+			certDER = block.Bytes
+			break
+		}
+		certPEM = rest
+	}
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		logger.Error(err, "failed to parse certificate for metrics")
+		return
+	}
+	r.Metrics.CertExpiryTimestamp.WithLabelValues(clientName, cert.Subject.CommonName).Set(float64(cert.NotAfter.Unix()))
 }
 
 // SetupWithManager sets up the controller with the Manager.
