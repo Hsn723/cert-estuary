@@ -14,15 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//nolint:lll
 package utils
 
 import (
 	"bufio"
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
 )
@@ -120,6 +128,16 @@ func InstallCertManager() error {
 	if _, err := Run(cmd); err != nil {
 		return err
 	}
+	// Enable feature gate
+	cmd = exec.Command("kubectl", "patch", "deployment", "cert-manager",
+		"--type", "json",
+		"-p", `[{ "op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--feature-gates=ExperimentalCertificateSigningRequestControllers=true" }]`,
+		"--namespace", "cert-manager",
+	)
+	if _, err := Run(cmd); err != nil {
+		return err
+	}
+
 	// Wait for cert-manager-webhook to be ready, which can take time if cert-manager
 	// was re-installed after uninstalling on a cluster.
 	cmd = exec.Command("kubectl", "wait", "deployment.apps/cert-manager-webhook",
@@ -248,4 +266,97 @@ func UncommentCode(filename, target, prefix string) error {
 	// false positive
 	// nolint:gosec
 	return os.WriteFile(filename, out.Bytes(), 0644)
+}
+
+func GetCurlPodSpec(command, serviceAccountName string) string {
+	return fmt.Sprintf(`{
+		"spec": {
+			"containers": [{
+				"name": "curl",
+				"image": "curlimages/curl:latest",
+				"command": ["/bin/sh", "-c"],
+				"args": [%s],
+				"securityContext": {
+					"allowPrivilegeEscalation": false,
+					"capabilities": {
+						"drop": ["ALL"]
+					},
+					"runAsNonRoot": true,
+					"runAsUser": 1000,
+					"seccompProfile": {
+						"type": "RuntimeDefault"
+					}
+				}
+			}],
+			"serviceAccount": "%s"
+		}
+	}`, command, serviceAccountName)
+}
+
+func GenerateClientCert(commonName string, caCert *x509.Certificate, caKey *ecdsa.PrivateKey) ([]byte, []byte, error) {
+	serial, err := rand.Int(rand.Reader, caCert.SerialNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	certTemplate := &x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		NotBefore:             time.Now().Add(-time.Minute),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+	certDER, err := x509.CreateCertificate(rand.Reader, certTemplate, caCert, &priv.PublicKey, caKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+	return certPEM, keyPEM, nil
+}
+
+func GenerateCSR(commonName string) ([]byte, []byte, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	csrTemplate := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		SignatureAlgorithm: x509.ECDSAWithSHA256,
+	}
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+	csr, err := x509.CreateCertificateRequest(rand.Reader, csrTemplate, priv)
+	if err != nil {
+		return nil, nil, err
+	}
+	return csr, keyPEM, nil
+}
+
+func CreateKeySecret(name, namespace string, keyPEM []byte) string {
+	return fmt.Sprintf(`apiVersion: v1
+kind: Secret
+metadata:
+  name: %s
+  namespace: %s
+type: Opaque
+data:
+  tls.key: %s
+`, name, namespace, string(keyPEM))
 }

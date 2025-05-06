@@ -1,0 +1,35 @@
+# Add the volumeMount for the est server certs
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts/-
+  value:
+    mountPath: /tmp/est-server/serving-certs
+    name: est-cert
+    readOnly: true
+
+# Add the --est-ca-cert-filepath argument for the est server
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --est-ca-cert-filepath=/tmp/est-server/serving-certs/ca.crt
+
+# Add the est server certs volume configuration
+- op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    name: est-cert
+    secret:
+      secretName: est-server-cert
+      optional: false
+      items:
+        - key: ca.crt
+          path: ca.crt
+        - key: tls.crt
+          path: tls.crt
+        - key: tls.key
+          path: tls.key
+
+# Add the ca certificate for the est server
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: SSL_CERT_FILE
+    value: /tmp/est-server/serving-certs/ca.crt

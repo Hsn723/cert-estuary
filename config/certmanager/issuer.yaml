@@ -1,0 +1,36 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: cert-estuary-issuer
+  namespace: cert-estuary-system
+  labels:
+    app.kubernetes.io/name: cert-estuary
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: est-selfsigned-ca
+  namespace: cert-estuary-system
+spec:
+  secretName: est-selfsigned-ca
+  issuerRef:
+    name: cert-estuary-issuer
+    kind: Issuer
+    group: cert-manager.io
+  commonName: est-selfsigned-ca
+  isCA: true
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: est-selfsigned-ca-issuer
+  namespace: cert-estuary-system
+spec:
+  ca:
+    secretName: est-selfsigned-ca
