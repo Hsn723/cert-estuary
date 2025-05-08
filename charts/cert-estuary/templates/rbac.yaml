@@ -90,31 +90,6 @@ rules:
   - patch
   - update
 - apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests
-  verbs:
-  - approve
-  - create
-  - delete
-  - get
-  - list
-  - watch
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests/approval
-  verbs:
-  - update
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - cert-manager.io
   resources:
   - signers
@@ -156,6 +131,61 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: '{{ template "project.name" . }}-manager-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ template "project.name" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: '{{ .Release.Service }}'
+    app.kubernetes.io/name: '{{ include "project.name" . }}'
+    app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
+    helm.sh/chart: '{{ include "project.chart" . }}'
+  name: '{{ template "project.name" . }}-manager-clusterrole'
+  namespace: '{{ .Release.Namespace }}'
+rules:
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - approve
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/approval
+  verbs:
+  - update
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: '{{ .Release.Service }}'
+    app.kubernetes.io/name: '{{ include "project.name" . }}'
+    app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
+    helm.sh/chart: '{{ include "project.chart" . }}'
+  name: '{{ template "project.name" . }}-manager-clusterrolebinding'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ template "project.name" . }}-manager-clusterrole'
 subjects:
 - kind: ServiceAccount
   name: '{{ template "project.name" . }}-controller-manager'
