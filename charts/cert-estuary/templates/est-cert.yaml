@@ -17,3 +17,15 @@ spec:
     name: {{ template "project.name" . }}-selfsigned-issuer
     {{- end }}
   secretName: est-server-cert
+---
+{{- if not .Values.controller.issuerName}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "project.name" . }}-selfsigned-issuer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "project.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}
