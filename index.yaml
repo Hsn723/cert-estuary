@@ -1,0 +1,15 @@
+apiVersion: v1
+entries:
+  cert-estuary:
+  - apiVersion: v2
+    appVersion: 0.1.1
+    created: "2025-05-08T11:52:31.332246296Z"
+    description: A Kubernetes controller that seamlessly bridges EST and ACME for
+      certificate creation and renewal.
+    digest: 5d858b24513b1d44908206ffd3f5e79056610ff3468571ad13373b99b5a96585
+    name: cert-estuary
+    type: application
+    urls:
+    - https://github.com/Hsn723/cert-estuary/releases/download/helm-v0.1.1/cert-estuary-0.1.1.tgz
+    version: 0.1.1
+generated: "2025-05-08T11:52:31.332250865Z"
