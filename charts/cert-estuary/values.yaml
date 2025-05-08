@@ -24,7 +24,7 @@ controller:
   extraArgs: ["--leader-elect"]
 
   # issuerName -- Specify the name of the issuer.
-  issuerName: selfsigned-issuer
+  # issuerName: selfsigned-issuer
 
   # enableWebhook -- Enable the webhook server. The webhook server is not yet implemented.
   enableWebhook: false

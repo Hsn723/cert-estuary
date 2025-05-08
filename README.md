@@ -1,3 +1,11 @@
+[![GitHub release](https://img.shields.io/github/release/hsn723/cert-estuary.svg?sort=semver&maxAge=60)](https://github.com/hsn723/cert-estuary/releases)
+[![Helm release](https://img.shields.io/badge/dynamic/yaml.svg?label=chart&url=https://hsn723.github.io/cert-estuary/index.yaml&query=$.entries[%22cert-estuary%22][0].version&colorB=orange&logo=helm)](https://github.com/hsn723/cert-estuary/releases)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cert-estuary)](https://artifacthub.io/packages/helm/cert-estuary/cert-estuary)
+[![main](https://github.com/Hsn723/cert-estuary/actions/workflows/main.yml/badge.svg?branch=master)](https://github.com/Hsn723/cert-estuary/actions/workflows/main.yml)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/hsn723/cert-estuary?tab=overview)](https://pkg.go.dev/github.com/hsn723/cert-estuary?tab=overview)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hsn723/cert-estuary)](https://goreportcard.com/report/github.com/hsn723/cert-estuary)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/hsn723/cert-estuary)
+
 # cert-estuary
 
 `cert-estuary` is a Kubernetes controller that provides a bridge between EST and ACME for certificate creation and renewal.
