@@ -3,7 +3,7 @@ image:
   repository: ghcr.io/hsn723/cert-estuary
   # image.tag -- image tag to use.
   # @default -- `{{ .Chart.AppVersion }}`
-  tag: v0.1.0
+  # tag: v0.1.0
   # image.pullPolicy -- image pullPolicy.
   pullPolicy:  # Always
 
