@@ -93,17 +93,6 @@ spec:
     csrAutoApprove: true
 
     duration: 1128h # 47d
-
-    # By default, certificates about to expire are automatically renewed,
-    # to reduce delays to EST clients during the /simplereenroll workflow.
-    # If this behavior is undesirable, set this to false.
-    autoRenew: true
-    renewBefore: 360h # 15d
-    #renewBeforePercentage: 0.6
-
-    # By default, expired certificates are removed as they are no longer needed.
-    # To disable this behavior and require manual deletion, set this to false.
-    removeExpired: true
 ```
 
 When requesting or renewing a certificate, via the EST `/simpleenroll` or `/simplereenroll` endpoints, `cert-estuary` validates the client by looking for an `ESTAuthorizedClient` matching the CommonName in the CSR. These values must then match the client certificate presented during the initial TLS handshake.
