@@ -1,5 +1,4 @@
 project_name: cert-estuary
-dist: bin/
 before:
   hooks:
     - go mod download
