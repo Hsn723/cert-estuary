@@ -61,8 +61,7 @@ spec:
                   The secret should contain a key named "username" for the username and "password" for the password.
                 properties:
                   secretName:
-                    description: SecretName is the name of the secret that contains
-                      the pre-shared key.
+                    description: SecretName is the name of the secret.
                     type: string
                 required:
                 - secretName
@@ -89,6 +88,18 @@ spec:
                 items:
                   type: string
                 type: array
+              trustAnchor:
+                description: |-
+                  TrustAnchor is a reference to a secret that contains the CA certificate used to verify the EST client's certificate.
+                  When present, client certificate validation relies on the specified CA certificate instead of using the system's CA certificates.
+                  The secret must be in the same namespace as the ESTAuthorizedClient resource and contain a key named "ca.crt" with the CA certificate in PEM format.
+                properties:
+                  secretName:
+                    description: SecretName is the name of the secret.
+                    type: string
+                required:
+                - secretName
+                type: object
             required:
             - csrAutoApprove
             - duration

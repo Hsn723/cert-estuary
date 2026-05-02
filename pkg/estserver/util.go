@@ -12,6 +12,7 @@ import (
 	"github.com/fullsailor/pkcs7"
 	certestuaryv1 "github.com/hsn723/cert-estuary/api/v1"
 	certsv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -86,13 +87,43 @@ func (s *ESTServer) findAuthenticatedClient(ctx context.Context, csr x509.Certif
 }
 
 func (s *ESTServer) authenticateClientCert(eac certestuaryv1.ESTAuthorizedClient, cert x509.Certificate) error {
-	if _, err := cert.Verify(x509.VerifyOptions{}); err != nil {
+	rootPool, err := s.getRootPool(eac)
+	if err != nil {
+		return fmt.Errorf("failed to get root pool: %w", err)
+	}
+	opts := x509.VerifyOptions{
+		Roots: rootPool,
+	}
+	if _, err := cert.Verify(opts); err != nil {
 		return err
 	}
 	if cert.Subject.CommonName != eac.Spec.Subject {
 		return fmt.Errorf("client certificate common name does not match ESTAuthorizedClient")
 	}
 	return nil
+}
+
+func (s *ESTServer) getRootPool(eac certestuaryv1.ESTAuthorizedClient) (*x509.CertPool, error) {
+	rootPool := x509.NewCertPool()
+	if eac.Spec.TrustAnchor.SecretName == "" {
+		return nil, nil
+	}
+	secret := &corev1.Secret{}
+	secretKey := client.ObjectKey{
+		Name:      eac.Spec.TrustAnchor.SecretName,
+		Namespace: eac.Namespace,
+	}
+	if err := s.Options.Client.Get(context.Background(), secretKey, secret); err != nil {
+		return nil, fmt.Errorf("failed to retrieve trust anchor secret: %w", err)
+	}
+	caCertPEM, ok := secret.Data["ca.crt"]
+	if !ok {
+		return nil, fmt.Errorf("trust anchor secret does not contain 'ca.crt' key")
+	}
+	if !rootPool.AppendCertsFromPEM(caCertPEM) {
+		return nil, fmt.Errorf("failed to append CA certificate to root pool")
+	}
+	return rootPool, nil
 }
 
 func (s *ESTServer) retrieveRequestContext(r *http.Request) (x509.CertificateRequest, *certestuaryv1.ESTAuthorizedClient, ESTError) {
