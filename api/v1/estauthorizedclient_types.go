@@ -48,7 +48,12 @@ type ESTAuthorizedClientSpec struct {
 	// PresharedKeyRef is a reference to a secret that contains the pre-shared key
 	// used for authentication. The secret must be in the same namespace as the ESTAuthorizedClient resource.
 	// The secret should contain a key named "username" for the username and "password" for the password.
-	PresharedKeyRef PresharedKeyRef `json:"presharedKeyRef,omitempty"`
+	PresharedKeyRef SecretRef `json:"presharedKeyRef,omitempty"`
+
+	// TrustAnchor is a reference to a secret that contains the CA certificate used to verify the EST client's certificate.
+	// When present, client certificate validation relies on the specified CA certificate instead of using the system's CA certificates.
+	// The secret must be in the same namespace as the ESTAuthorizedClient resource and contain a key named "ca.crt" with the CA certificate in PEM format.
+	TrustAnchor SecretRef `json:"trustAnchor,omitempty"`
 
 	// SignerName is the name of the Issuer or ClusterIssuer
 	// that will be used to sign the certificate.
@@ -72,8 +77,8 @@ type ESTAuthorizedClientSpec struct {
 	Duration *metav1.Duration `json:"duration"`
 }
 
-type PresharedKeyRef struct {
-	// SecretName is the name of the secret that contains the pre-shared key.
+type SecretRef struct {
+	// SecretName is the name of the secret.
 	// +kubebuilder:validation:Required
 	SecretName string `json:"secretName"`
 }
