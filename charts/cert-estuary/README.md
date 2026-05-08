@@ -2,23 +2,22 @@
 
 ## Quick start
 
-### Add the Helm repository
+### Pull the helm chart
 
 ```sh
-helm repo add cert-estuary https://hsn723.github.io/cert-estuary
-helm repo update
+helm pull oci://ghcr.io/hsn723/charts/cert-estuary --version ${VERSION}
 ```
 
 ### Install the chart
 
 ```sh
-helm install --create-namespace --namespace cert-estuary cert-estuary cert-estuary/cert-estuary
+helm install --create-namespace --namespace cert-estuary cert-estuary oci://ghcr.io/hsn723/charts/cert-estuary --version ${VERSION}
 ```
 
 Specify parameters using `--set key=value[,key=value]` arguments to `helm install`, or provide your own `values.yaml`:
 
 ```sh
-helm install --create-namespace --namespace cert-estuary cert-estuary -f values.yaml cert-estuary/cert-estuary
+helm install --create-namespace --namespace cert-estuary cert-estuary -f values.yaml oci://ghcr.io/hsn723/charts/cert-estuary --version ${VERSION}
 ```
 
 ## Values
@@ -35,5 +34,5 @@ helm install --create-namespace --namespace cert-estuary cert-estuary -f values.
 
 ## Generate Manifests
 ```sh
-helm template --namespace cert-estuary cert-estuary [-f values.yaml] cert-estuary/cert-estuary
+helm template --namespace cert-estuary cert-estuary [-f values.yaml] oci://ghcr.io/hsn723/charts/cert-estuary --version ${VERSION}
 ```
